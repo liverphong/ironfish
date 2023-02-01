@@ -47,7 +47,7 @@ export class ImportCommand extends IronfishCommand {
       return this.exit(1)
     }
 
-    if (account.version == 0) {
+    if (account.version === 0) {
       // legacy account that has no version. update it to version 1, where we started tracking account versions
       account.version = 1
     }
