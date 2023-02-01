@@ -104,13 +104,39 @@ export class MiningPoolShares {
   // TODO: This function is a rough shell, will be filled out with logic in follow-up PR
   async createNewPayout(): Promise<void> {
     const payoutPeriod = await this.db.earliestOutstandingPayoutPeriod()
-
     if (!payoutPeriod) {
       this.logger.debug('No outstanding shares, skipping payout')
       return
     }
 
-    // TODO: Rest of logic will go here
+    const blocksConfirmed = await this.db.payoutPeriodBlocksConfirmed(payoutPeriod.id)
+    if (!blocksConfirmed) {
+      return
+    }
+
+    const payoutAddresses = await this.db.payoutAddresses(payoutPeriod.id)
+
+    const totalPayoutReward = await this.db.getPayoutReward(payoutPeriod.id)
+
+    // Subtract the amount of recipients since that's how we estimate a
+    // transaction fee right now. If we move to use the fee estimator, we will
+    // need to update this logic as well.
+    const totalPayoutAmount = totalPayoutReward - BigInt(payoutAddresses.length)
+
+    const totalShareCount = await this.db.payoutPeriodShareCount(payoutPeriod.id)
+    // TODO: We need to handle the possibility that a period has no shares - not
+    // sure its actually possible to get in that state in real world
+    const amountPerShare = totalPayoutAmount / BigInt(totalShareCount)
+
+    console.log(
+      `${totalPayoutAmount} total amount. ${totalShareCount} total shares. ${amountPerShare} eps. ${payoutAddresses.length} recipients`,
+    )
+
+    // TODO: Simple sanity check function
+    for (const obj of payoutAddresses) {
+      const payoutAmount = BigInt(obj.shareCount) * amountPerShare
+      console.log(`${obj.publicAddress} earned ${payoutAmount}`)
+    }
 
     // TODO: Implement actual transaction hash instead of placeholder
     const transactionId = await this.submitPayoutTransaction('asdf', payoutPeriod.id)
@@ -307,5 +333,26 @@ export class MiningPoolShares {
     }
 
     await this.db.rolloverPayoutPeriod(now)
+  }
+
+  foo() {
+    // - Find first payout period with an unpaid-out share
+    // - Check that this payout (and related) all have confirmed blocks
+    //  - If any unconfirmed, early return. Try again later
+    // - Get total payout period reward
+    // - Get number of shares
+    // - Calculate earnings per share: total / number of shares
+    // - Get 100 unique public addresses and the sum of ALL their shares in the payout period
+    // - Calculate each addresses reward: num shares * earnings per share
+    // ---- The rest of this can be the next PR
+    // - Create a transaction
+    // - Create a payout transaction row in DB
+    // - Associate shares with payout transaction ID
+    //
+    // - Separately, check unconfirmed, unexpired transactions on loop.
+    // - Update as needed. Same logic as block.
+    // - If a transaction expires/never gets confirmed, we have to delete the association on shares
+    // - Probably worth tracking the status of the transaction, so we can have visibility
+    //    if lots of transactions are expiring
   }
 }
