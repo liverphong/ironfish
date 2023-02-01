@@ -99,6 +99,8 @@ export class ImportCommand extends IronfishCommand {
     return {
       name: accountName,
       spendingKey: spendingKey,
+      // the user doesn't know about versions, so assume the latest
+      version: 1,
     }
   }
 }
