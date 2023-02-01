@@ -47,6 +47,11 @@ export class ImportCommand extends IronfishCommand {
       return this.exit(1)
     }
 
+    if (account.version == 0) {
+      // legacy account that has no version. update it to version 1, where we started tracking account versions
+      account.version = 1
+    }
+
     const result = await client.importAccount({
       account: account,
       rescan: flags.rescan,
@@ -99,8 +104,8 @@ export class ImportCommand extends IronfishCommand {
     return {
       name: accountName,
       spendingKey: spendingKey,
-      // the user doesn't know about versions, so assume the latest
-      version: 1,
+      // the user doesn't know about versions, so provide none
+      version: 0,
     }
   }
 }
