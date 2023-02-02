@@ -79,6 +79,53 @@ export class PoolDatabase {
     await this.db.run(sql, sequence, hash, reward)
   }
 
+  async newTransaction(hash: string, payoutPeriodId: number): Promise<number | undefined> {
+    const sql = `
+      INSERT INTO payoutTransaction (transactionHash, payoutPeriodId) VALUES (?, ?)
+    `
+
+    const result = await this.db.run(sql, hash, payoutPeriodId)
+
+    return result.lastID
+  }
+
+  async markSharesPaid(payoutPeriodId: number, payoutTransactionId: number): Promise<void> {
+    const sql = `
+      UPDATE payoutShare
+      SET payoutTransactionId = ?
+      WHERE
+        payoutPeriodId = ?
+        AND publicAddress IN (
+          SELECT publicAddress
+          FROM payoutShare
+          WHERE
+            payoutPeriodId = ?
+            AND payoutTransactionId IS NULL
+          GROUP BY publicAddress
+          LIMIT ?
+        )
+    `
+
+    await this.db.run(
+      sql,
+      payoutTransactionId,
+      payoutPeriodId,
+      payoutPeriodId,
+      MAX_ADDRESSES_PER_PAYOUT,
+    )
+  }
+
+  async removeSharesFromTransaction(transactionId: number): Promise<void> {
+    const sql = `
+      UPDATE payoutShare
+      SET payoutTransactionId = NULL
+      WHERE
+        payoutTransactionId = ?
+    `
+
+    await this.db.run(sql, transactionId)
+  }
+
   async getSharesForPayout(timestamp: number): Promise<DatabaseShare[]> {
     return await this.db.all(
       "SELECT * FROM share WHERE payoutId IS NULL AND createdAt < datetime(?, 'unixepoch')",
@@ -160,10 +207,14 @@ export class PoolDatabase {
   async payoutAddresses(
     payoutPeriodId: number,
   ): Promise<{ publicAddress: string; shareCount: number }[]> {
+    // TODO: Make this a view? This is duplicated in markSharesPaid(). May also
+    // need an order by for explicitness
     const sql = `
       SELECT publicAddress, COUNT(id) shareCount
       FROM payoutShare
-      WHERE payoutPeriodId = ?
+      WHERE
+        payoutPeriodId = ?
+        AND payoutTransactionId IS NULL
       GROUP BY publicAddress
       LIMIT ?
     `
@@ -196,6 +247,32 @@ export class PoolDatabase {
     )
   }
 
+  async unconfirmedTransactions(): Promise<DatabasePayoutTransaction[]> {
+    const sql = 'SELECT * FROM payoutTransaction WHERE confirmed = FALSE AND expired = FALSE'
+
+    const rows = await this.db.all<RawDatabasePayoutTransaction[]>(sql)
+
+    const result: DatabasePayoutTransaction[] = []
+    for (const row of rows) {
+      result.push(parseDatabasePayoutTransaction(row))
+    }
+
+    return result
+  }
+
+  async updateTransactionStatus(
+    transactionId: number,
+    confirmed: boolean,
+    expired: boolean,
+  ): Promise<void> {
+    await this.db.run(
+      'UPDATE payoutTransaction SET confirmed = ?, expired = ? WHERE id = ?',
+      confirmed,
+      expired,
+      transactionId,
+    )
+  }
+
   async getCurrentPayoutPeriod(): Promise<DatabasePayoutPeriod | undefined> {
     const period = await this.db.get<DatabasePayoutPeriod>(
       'SELECT * FROM payoutPeriod WHERE end is null',
@@ -207,6 +284,15 @@ export class PoolDatabase {
   async rolloverPayoutPeriod(timestamp: number): Promise<void> {
     await this.db.run('UPDATE payoutPeriod SET end = ? WHERE end IS NULL', timestamp - 1)
     await this.db.run('INSERT INTO payoutPeriod (start) VALUES (?)', timestamp)
+  }
+
+  async earliestOutstandingPayoutPeriod(): Promise<DatabasePayoutPeriod | undefined> {
+    const sql = `
+      SELECT * FROM payoutPeriod WHERE id = (
+        SELECT payoutPeriodId FROM payoutShare WHERE payoutTransactionId IS NULL ORDER BY id LIMIT 1
+      )
+    `
+    return await this.db.get<DatabasePayoutPeriod>(sql)
   }
 }
 
@@ -263,5 +349,34 @@ function parseDatabaseBlock(rawBlock: RawDatabaseBlock): DatabaseBlock {
     minerReward: BigInt(rawBlock.minerReward),
     confirmed: Boolean(rawBlock.confirmed),
     main: Boolean(rawBlock.main),
+  }
+}
+
+export type DatabasePayoutTransaction = {
+  id: number
+  createdAt: Date
+  transactionHash: string
+  confirmed: boolean
+  expired: boolean
+  payoutPeriodId: number
+}
+
+interface RawDatabasePayoutTransaction {
+  id: number
+  createdAt: string
+  transactionHash: string
+  confirmed: number
+  expired: number
+  payoutPeriodId: number
+}
+
+function parseDatabasePayoutTransaction(rawTransaction: RawDatabasePayoutTransaction) {
+  return {
+    id: rawTransaction.id,
+    createdAt: new Date(rawTransaction.createdAt),
+    transactionHash: rawTransaction.transactionHash,
+    confirmed: Boolean(rawTransaction.confirmed),
+    expired: Boolean(rawTransaction.expired),
+    payoutPeriodId: rawTransaction.payoutPeriodId,
   }
 }

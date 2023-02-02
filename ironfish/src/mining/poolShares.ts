@@ -9,7 +9,7 @@ import { ErrorUtils } from '../utils'
 import { BigIntUtils } from '../utils/bigint'
 import { MapUtils } from '../utils/map'
 import { DatabaseShare, PoolDatabase } from './poolDatabase'
-import { DatabaseBlock } from './poolDatabase/database'
+import { DatabaseBlock, DatabasePayoutTransaction } from './poolDatabase/database'
 import { WebhookNotifier } from './webhooks'
 
 export class MiningPoolShares {
@@ -92,6 +92,35 @@ export class MiningPoolShares {
     }
 
     await this.db.newBlock(sequence, hash, reward.toString())
+  }
+
+  async submitPayoutTransaction(
+    hash: string,
+    payoutPeriodId: number,
+  ): Promise<number | undefined> {
+    return await this.db.newTransaction(hash, payoutPeriodId)
+  }
+
+  // TODO: This function is a rough shell, will be filled out with logic in follow-up PR
+  async createNewPayout(): Promise<void> {
+    const payoutPeriod = await this.db.earliestOutstandingPayoutPeriod()
+
+    if (!payoutPeriod) {
+      this.logger.debug('No outstanding shares, skipping payout')
+      return
+    }
+
+    // TODO: Rest of logic will go here
+
+    // TODO: Implement actual transaction hash instead of placeholder
+    const transactionId = await this.submitPayoutTransaction('asdf', payoutPeriod.id)
+
+    if (!transactionId) {
+      this.logger.error('A new payout transaction was not created in the database')
+      return
+    }
+
+    await this.db.markSharesPaid(payoutPeriod.id, transactionId)
   }
 
   async createPayout(): Promise<void> {
@@ -243,6 +272,26 @@ export class MiningPoolShares {
     }
 
     await this.db.updateBlockStatus(block.id, main, confirmed)
+  }
+
+  async unconfirmedPayoutTransactions(): Promise<DatabasePayoutTransaction[]> {
+    return await this.db.unconfirmedTransactions()
+  }
+
+  async updatePayoutTransactionStatus(
+    transaction: DatabasePayoutTransaction,
+    confirmed: boolean,
+    expired: boolean,
+  ): Promise<void> {
+    if (confirmed === transaction.confirmed && expired === transaction.expired) {
+      return
+    }
+
+    await this.db.updateTransactionStatus(transaction.id, confirmed, expired)
+
+    if (expired && !confirmed) {
+      await this.db.removeSharesFromTransaction(transaction.id)
+    }
   }
 
   async rolloverPayoutPeriod(): Promise<void> {
