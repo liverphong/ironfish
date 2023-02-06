@@ -682,7 +682,7 @@ export class Wallet {
       expiration: expiration ?? undefined,
       confirmations: confirmations ?? undefined,
     })
-
+    Assert.isTruthy(sender.spendingKey, 'Spending key is required sending a transaction')
     return this.post(raw, memPool, sender.spendingKey)
   }
 
@@ -720,7 +720,7 @@ export class Wallet {
       expiration: options.expiration,
       confirmations: options.confirmations,
     })
-
+    Assert.isTruthy(account.spendingKey, 'Spending key is required sending a transaction')
     return this.post(raw, memPool, account.spendingKey)
   }
 
@@ -740,7 +740,8 @@ export class Wallet {
       expiration: expiration,
       confirmations: confirmations,
     })
-
+    // the spending key is needed for the proofs
+    Assert.isTruthy(account.spendingKey, 'Spending key is required sending a transaction')
     return this.post(raw, memPool, account.spendingKey)
   }
 

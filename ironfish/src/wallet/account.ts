@@ -29,7 +29,7 @@ export class Account {
   readonly id: string
   readonly displayName: string
   name: string
-  readonly spendingKey: string
+  readonly spendingKey?: string
   readonly incomingViewKey: string
   readonly outgoingViewKey: string
   publicAddress: string
@@ -39,20 +39,12 @@ export class Account {
   constructor({
     id,
     name,
+    publicAddress,
+    walletDb,
     spendingKey,
     incomingViewKey,
     outgoingViewKey,
-    publicAddress,
-    walletDb,
-  }: {
-    id: string
-    name: string
-    spendingKey: string
-    incomingViewKey: string
-    outgoingViewKey: string
-    publicAddress: string
-    walletDb: WalletDB
-  }) {
+  }: AccountValue & { walletDb: WalletDB }) {
     this.id = id
     this.name = name
     this.spendingKey = spendingKey

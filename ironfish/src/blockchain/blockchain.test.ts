@@ -21,6 +21,7 @@ import {
   usePostTxFixture,
   useTxFixture,
 } from '../testUtilities'
+import { WithRequired } from '../testUtilities/types'
 import { AsyncUtils } from '../utils'
 import { Account } from '../wallet'
 
@@ -901,7 +902,7 @@ describe('Blockchain', () => {
   describe('asset updates', () => {
     async function burnAsset(
       node: IronfishNode,
-      account: Account,
+      account: WithRequired<Account, 'spendingKey'>,
       sequence: number,
       asset: Asset,
       value: bigint,

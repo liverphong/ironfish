@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import * as yup from 'yup'
+import { Assert } from '../../../assert'
 import { Transaction } from '../../../primitives'
 import { RawTransactionSerde } from '../../../primitives/rawTransaction'
 import { ApiNamespace, router } from '../router'
@@ -36,7 +37,10 @@ router.register<typeof PostTransactionRequestSchema, PostTransactionResponse>(
   PostTransactionRequestSchema,
   async (request, node): Promise<void> => {
     const account = getAccount(node, request.data.sender)
-
+    Assert.isTruthy(
+      account.spendingKey,
+      'To post a transaction, your account my have a spending key',
+    )
     const rawTransactionBytes = Buffer.from(request.data.transaction, 'hex')
     const rawTransaction = RawTransactionSerde.deserialize(rawTransactionBytes)
     let postedTransaction: Transaction

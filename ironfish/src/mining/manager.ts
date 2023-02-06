@@ -142,6 +142,10 @@ export class MiningManager {
       newBlockSequence,
       currBlockSize,
     )
+    Assert.isTruthy(
+      account.spendingKey,
+      'To submit a mined block, your account must have a spending key',
+    )
 
     // Calculate the final fee for the miner of this block
     const minersFee = await this.node.strategy.createMinersFee(

@@ -2,23 +2,32 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Account, AccountValue, Wallet } from '../../wallet'
+import { WithRequired } from '../types'
 import { FixtureGenerate, useFixture } from './fixture'
 
 export function useAccountFixture(
   wallet: Wallet,
-  generate: FixtureGenerate<Account> | string = 'test',
-): Promise<Account> {
+  generate: FixtureGenerate<WithRequired<Account, 'spendingKey'>> | string = 'test',
+  setDefault = false,
+): Promise<WithRequired<Account, 'spendingKey'>> {
   if (typeof generate === 'string') {
     const name = generate
-    generate = () => wallet.createAccount(name)
+    generate = async () => {
+      const account = await wallet.createAccount(name, setDefault)
+      return account as WithRequired<Account, 'spendingKey'>
+    }
   }
 
   return useFixture(generate, {
-    serialize: (account: Account): AccountValue => {
-      return account.serialize()
+    serialize: (
+      account: WithRequired<Account, 'spendingKey'>,
+    ): WithRequired<AccountValue, 'spendingKey'> => {
+      return account.serialize() as WithRequired<AccountValue, 'spendingKey'>
     },
 
-    deserialize: async (accountData: AccountValue): Promise<Account> => {
+    deserialize: async (
+      accountData: WithRequired<AccountValue, 'spendingKey'>,
+    ): Promise<WithRequired<Account, 'spendingKey'>> => {
       const account = await wallet.importAccount(accountData)
       if (wallet.chainProcessor.hash && wallet.chainProcessor.sequence) {
         await account.updateHead({
@@ -28,7 +37,7 @@ export function useAccountFixture(
       } else {
         await account.updateHead(null)
       }
-      return account
+      return account as WithRequired<Account, 'spendingKey'>
     },
   })
 }

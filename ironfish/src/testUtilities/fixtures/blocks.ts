@@ -13,6 +13,7 @@ import { MintData, RawTransaction } from '../../primitives/rawTransaction'
 import { Transaction } from '../../primitives/transaction'
 import { Account, Wallet } from '../../wallet'
 import { WorkerPool } from '../../workerPool/pool'
+import { WithRequired } from '../types'
 import { useAccountFixture } from './account'
 import { FixtureGenerate, useFixture } from './fixture'
 import {
@@ -72,7 +73,7 @@ export async function useMinerBlockFixture(
   addTransactionsTo?: Wallet,
   transactions: Transaction[] = [],
 ): Promise<Block> {
-  const spendingKey = account ? account.spendingKey : generateKey().spending_key
+  const spendingKey = account?.spendingKey ?? generateKey().spending_key
   const transactionFees = transactions.reduce((a, t) => a + t.fee(), BigInt(0))
 
   return await useBlockFixture(
@@ -92,7 +93,7 @@ export async function useMinerBlockFixture(
 
 export async function useMintBlockFixture(options: {
   node: IronfishNode
-  account: Account
+  account: WithRequired<Account, 'spendingKey'>
   asset: Asset
   value: bigint
   sequence?: number
@@ -121,7 +122,7 @@ export async function useMintBlockFixture(options: {
 
 export async function useBurnBlockFixture(options: {
   node: IronfishNode
-  account: Account
+  account: WithRequired<Account, 'spendingKey'>
   asset: Asset
   value: bigint
   sequence?: number
@@ -145,7 +146,7 @@ export async function useBurnBlockFixture(options: {
 export async function useBlockWithRawTxFixture(
   chain: Blockchain,
   pool: WorkerPool,
-  sender: Account,
+  sender: WithRequired<Account, 'spendingKey'>,
   notesToSpend: NoteEncrypted[],
   receives: { publicAddress: string; amount: bigint; memo: string; assetId: Buffer }[],
   mints: MintData[],
@@ -208,16 +209,21 @@ export async function useBlockWithRawTxFixture(
  */
 export async function useBlockWithTx(
   node: IronfishNode,
-  from?: Account,
+  from?: WithRequired<Account, 'spendingKey'>,
   to?: Account,
   useFee = true,
   options: {
     expiration?: number
     fee?: number
   } = { expiration: 0 },
-): Promise<{ account: Account; previous: Block; block: Block; transaction: Transaction }> {
+): Promise<{
+  account: WithRequired<Account, 'spendingKey'>
+  previous: Block
+  block: Block
+  transaction: Transaction
+}> {
   if (!from) {
-    from = await useAccountFixture(node.wallet, () => node.wallet.createAccount('test'))
+    from = await useAccountFixture(node.wallet, 'test')
   }
 
   if (!to) {
@@ -257,7 +263,6 @@ export async function useBlockWithTx(
         expirationDelta: 0,
       },
     )
-
     const transaction = await node.wallet.post(raw, node.memPool, from.spendingKey)
 
     return node.chain.newBlock(
@@ -279,10 +284,14 @@ export async function useBlockWithTx(
 export async function useBlockWithTxs(
   node: IronfishNode,
   numTransactions: number,
-  from?: Account,
-): Promise<{ account: Account; block: Block; transactions: Transaction[] }> {
+  from?: WithRequired<Account, 'spendingKey'>,
+): Promise<{
+  account: WithRequired<Account, 'spendingKey'>
+  block: Block
+  transactions: Transaction[]
+}> {
   if (!from) {
-    from = await useAccountFixture(node.wallet, () => node.wallet.createAccount('test'))
+    from = await useAccountFixture(node.wallet, 'test')
   }
   const to = from
 
@@ -317,7 +326,6 @@ export async function useBlockWithTxs(
           expirationDelta: 0,
         },
       )
-
       const transaction = await node.wallet.post(raw, node.memPool, from.spendingKey)
 
       await node.wallet.addPendingTransaction(transaction)
@@ -340,11 +348,11 @@ export async function useBlockWithTxs(
 export async function useTxSpendsFixture(
   node: IronfishNode,
   options?: {
-    account?: Account
+    account?: WithRequired<Account, 'spendingKey'>
     expiration?: number
     restore?: boolean
   },
-): Promise<{ account: Account; transaction: Transaction }> {
+): Promise<{ account: WithRequired<Account, 'spendingKey'>; transaction: Transaction }> {
   const account = options?.account ?? (await useAccountFixture(node.wallet))
 
   const block = await useMinerBlockFixture(node.chain, 2, account, node.wallet)

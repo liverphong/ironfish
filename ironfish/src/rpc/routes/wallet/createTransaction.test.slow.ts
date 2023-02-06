@@ -5,11 +5,12 @@ import { Asset } from '@ironfish/rust-nodejs'
 import { RawTransactionSerde } from '../../../primitives/rawTransaction'
 import { useAccountFixture, useMinerBlockFixture, useTxFixture } from '../../../testUtilities'
 import { createRouteTest } from '../../../testUtilities/routeTest'
+import { WithRequired } from '../../../testUtilities/types'
 import { Account } from '../../../wallet'
 
 describe('Route wallet/createTransaction', () => {
   const routeTest = createRouteTest(true)
-  let sender: Account
+  let sender: WithRequired<Account, 'spendingKey'>
 
   beforeAll(async () => {
     sender = await useAccountFixture(routeTest.node.wallet, 'existingAccount')
