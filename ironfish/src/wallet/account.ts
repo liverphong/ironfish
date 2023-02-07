@@ -45,6 +45,7 @@ export class Account {
     outgoingViewKey,
     publicAddress,
     walletDb,
+    version,
   }: {
     id: string
     name: string
@@ -53,6 +54,7 @@ export class Account {
     outgoingViewKey: string
     publicAddress: string
     walletDb: WalletDB
+    version: number | undefined
   }) {
     this.id = id
     this.name = name
@@ -67,7 +69,7 @@ export class Account {
     this.displayName = `${name} (${id.slice(0, 7)})`
 
     this.walletDb = walletDb
-    this.version = 1
+    this.version = version ?? 1
   }
 
   serialize(): AccountValue {
