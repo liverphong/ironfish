@@ -6,7 +6,10 @@ use std::cell::RefCell;
 use std::convert::TryInto;
 
 use ironfish_rust::assets::asset::AssetIdentifier;
-use ironfish_rust::transaction::batch_verify_transactions;
+use ironfish_rust::transaction::{
+    batch_verify_transactions, TRANSACTION_EXPIRATION_SIZE, TRANSACTION_FEE_SIZE,
+    TRANSACTION_PUBLIC_KEY_SIZE, TRANSACTION_SIGNATURE_SIZE,
+};
 use ironfish_rust::{
     MerkleNoteHash, ProposedTransaction, PublicAddress, SaplingKey, Transaction,
     TRANSACTION_VERSION as TX_VERSION,
@@ -32,6 +35,18 @@ pub struct NativeTransactionPosted {
 
 #[napi]
 pub const PROOF_LENGTH: u32 = PROOF_SIZE;
+
+#[napi]
+pub const TRANSACTION_SIGNATURE_LENGTH: u32 = TRANSACTION_SIGNATURE_SIZE as u32;
+
+#[napi]
+pub const TRANSACTION_PUBLIC_KEY_RANDOMNESS_LENGTH: u32 = TRANSACTION_PUBLIC_KEY_SIZE as u32;
+
+#[napi]
+pub const TRANSACTION_EXPIRATION_LENGTH: u32 = TRANSACTION_EXPIRATION_SIZE as u32;
+
+#[napi]
+pub const TRANSACTION_FEE_LENGTH: u32 = TRANSACTION_FEE_SIZE as u32;
 
 #[napi]
 pub const TRANSACTION_VERSION: u8 = TX_VERSION;
@@ -169,7 +184,7 @@ impl NativeTransaction {
 
     /// Create a proof of a new note owned by the recipient in this transaction.
     #[napi]
-    pub fn receive(&mut self, note: &NativeNote) -> Result<()> {
+    pub fn output(&mut self, note: &NativeNote) -> Result<()> {
         self.transaction
             .add_output(note.note.clone())
             .map_err(to_napi_err)?;

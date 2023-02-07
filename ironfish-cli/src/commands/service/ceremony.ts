@@ -11,6 +11,7 @@ import { S3Utils } from '../../utils'
 const CONTRIBUTE_TIMEOUT_MS = 5 * 60 * 1000
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000
 const PRESIGNED_EXPIRATION_SEC = 5 * 60
+const START_DATE = 1676318400000 // Mon Feb 13 2023 12:00:00 GMT-0800 (Pacific Standard Time)
 
 export default class Ceremony extends IronfishCommand {
   static hidden = true
@@ -43,6 +44,19 @@ export default class Ceremony extends IronfishCommand {
       description: 'How many seconds the S3 pre-signed upload URL is valid for a contributor',
       default: PRESIGNED_EXPIRATION_SEC,
     }),
+    startDate: Flags.integer({
+      required: false,
+      description: 'When should the server start accepting contributions',
+      default: START_DATE,
+    }),
+    token: Flags.string({
+      required: true,
+    }),
+    skipIPCheck: Flags.boolean({
+      required: false,
+      description: 'Pass this flag if you want to skip checking for duplicate IPs',
+      default: false,
+    }),
   }
 
   async start(): Promise<void> {
@@ -65,6 +79,9 @@ export default class Ceremony extends IronfishCommand {
       contributionTimeoutMs: flags.contributionTimeoutMs,
       uploadTimeoutMs: flags.uploadTimeoutMs,
       presignedExpirationSec: flags.presignedExpirationSec,
+      startDate: flags.startDate,
+      token: flags.token,
+      enableIPBanning: !flags.skipIPCheck,
     })
 
     await server.start()

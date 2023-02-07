@@ -27,6 +27,9 @@ export default class Ceremony extends IronfishCommand {
       default: 9040,
       description: 'Port of the ceremony coordination server',
     }),
+    token: Flags.string({
+      required: false,
+    }),
   }
 
   async start(): Promise<void> {
@@ -46,10 +49,15 @@ export default class Ceremony extends IronfishCommand {
 
     // Prompt for randomness
     let randomness: string | null = await CliUx.ux.prompt(
-      `If you'd like to contribute your own randomness to the ceremony, type it here, then press Enter. For more information on where this should come from and its importance, please read https://setup.ironfish.network. If you'd like the command to generate some randomness for you, just press Enter:`,
+      `If you'd like to contribute your own randomness to the ceremony, type it here, then press Enter. For more information on where this should come from and its importance, please read https://setup.ironfish.network. If you'd like the command to generate some randomness for you, just press Enter`,
       { required: false },
     )
     randomness = randomness.length ? randomness : null
+
+    const name = await CliUx.ux.prompt(
+      `If you'd like to associate a name with this contribution, type it here, then press Enter. Otherwise, to contribute anonymously, just press Enter`,
+      { required: false },
+    )
 
     // Create the client and bind events
     const client = new CeremonyClient({
@@ -169,6 +177,15 @@ export default class Ceremony extends IronfishCommand {
       this.exit(0)
     })
 
+    client.onStopRetry.on(({ error }) => {
+      CliUx.ux.action.stop()
+      refreshEtaInterval && clearInterval(refreshEtaInterval)
+
+      this.log(`Stopping contribution: ${error}`)
+
+      client.stop(true)
+    })
+
     // Retry connection until contributions are received
     let connected = false
     while (!connected) {
@@ -183,10 +200,12 @@ export default class Ceremony extends IronfishCommand {
         continue
       }
 
+      client.join(name, flags.token)
+
       CliUx.ux.action.start('Waiting to contribute', undefined, { stdout: true })
 
       const result = await client.waitForStop()
-      connected = result.success
+      connected = result.stopRetries
 
       if (!connected) {
         if (CliUx.ux.action.running) {

@@ -72,9 +72,20 @@ export class Send extends IronfishCommand {
       description:
         'The block sequence after which the transaction will be removed from the mempool. Set to 0 for no expiration.',
     }),
+    confirmations: Flags.integer({
+      char: 'c',
+      description:
+        'Minimum number of block confirmations needed to include a note. Set to 0 to include all blocks.',
+      required: false,
+    }),
     assetId: Flags.string({
       char: 'i',
       description: 'The identifier for the asset to use when sending',
+    }),
+    rawTransaction: Flags.boolean({
+      default: false,
+      description:
+        'Return raw transaction. Use it to create a transaction but not post to the network',
     }),
   }
 
@@ -87,6 +98,7 @@ export class Send extends IronfishCommand {
     let to = flags.to?.trim()
     let from = flags.account?.trim()
     const expiration = flags.expiration
+    const confirmations = flags.confirmations
     const memo = flags.memo || ''
 
     const client = await this.sdk.connectRpc(false, true)
@@ -104,6 +116,7 @@ export class Send extends IronfishCommand {
         action: 'send',
         showNativeAsset: true,
         showSingleAssetChoice: false,
+        confirmations: confirmations,
       })
     }
 
@@ -116,7 +129,7 @@ export class Send extends IronfishCommand {
     }
 
     if (amount === null) {
-      const response = await client.getAccountBalance({ account: from, assetId })
+      const response = await client.getAccountBalance({ account: from, assetId, confirmations })
 
       const input = await CliUx.ux.prompt(
         `Enter the amount (balance: ${CurrencyUtils.renderIron(response.content.confirmed)})`,
@@ -196,6 +209,7 @@ export class Send extends IronfishCommand {
           },
         ],
         expiration: expiration,
+        confirmations: confirmations,
       }
 
       const allPromises: Promise<RpcResponseEnded<CreateTransactionResponse>>[] = []
@@ -243,6 +257,7 @@ export class Send extends IronfishCommand {
         fee: fee,
         feeRate: feeRate,
         expiration: expiration,
+        confirmations: confirmations,
       })
       rawTransactionResponse = createResponse.content.transaction
     }
@@ -252,7 +267,7 @@ export class Send extends IronfishCommand {
 
     if (!flags.confirm) {
       this.log(`
-You are about to send:
+You are about to create a transaction:
 ${CurrencyUtils.renderIron(
   amount,
   true,
@@ -261,15 +276,22 @@ ${CurrencyUtils.renderIron(
         rawTransaction.fee,
         true,
       )} to ${to} from the account ${from}
-
-* This action is NOT reversible *
 `)
+      if (!flags.rawTransaction) {
+        this.log(`* This action is NOT reversible *\n`)
+      }
 
       const confirm = await CliUx.ux.confirm('Do you confirm (Y/N)?')
       if (!confirm) {
         this.log('Transaction aborted.')
         this.exit(0)
       }
+    }
+
+    if (flags.rawTransaction) {
+      this.log(`Raw transaction: ${rawTransactionResponse}`)
+      this.log(`\nRun "ironfish wallet:post" to post the raw transaction. `)
+      this.exit(0)
     }
 
     // Run the progress bar for about 2 minutes
@@ -302,6 +324,7 @@ ${CurrencyUtils.renderIron(
     try {
       const result = await client.postTransaction({
         transaction: rawTransactionResponse,
+        sender: from,
       })
 
       stopProgressBar()

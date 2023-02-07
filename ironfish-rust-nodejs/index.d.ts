@@ -35,6 +35,10 @@ export interface NativeSpendDescription {
   nullifier: Buffer
 }
 export const PROOF_LENGTH: number
+export const TRANSACTION_SIGNATURE_LENGTH: number
+export const TRANSACTION_PUBLIC_KEY_RANDOMNESS_LENGTH: number
+export const TRANSACTION_EXPIRATION_LENGTH: number
+export const TRANSACTION_FEE_LENGTH: number
 export const TRANSACTION_VERSION: number
 export function verifyTransactions(serializedTransactions: Array<Buffer>): boolean
 export const enum LanguageCode {
@@ -145,7 +149,7 @@ export type NativeTransaction = Transaction
 export class Transaction {
   constructor(spenderHexKey: string)
   /** Create a proof of a new note owned by the recipient in this transaction. */
-  receive(note: Note): void
+  output(note: Note): void
   /** Spend the note owned by spender_hex_key at the given witness location. */
   spend(note: Note, witness: object): void
   /** Mint a new asset with a given value as part of this transaction. */

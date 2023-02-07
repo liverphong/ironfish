@@ -38,6 +38,8 @@ import {
   GetFundsRequest,
   GetFundsResponse,
   GetLogStreamResponse,
+  GetNetworkHashPowerRequest,
+  GetNetworkHashPowerResponse,
   GetNodeStatusRequest,
   GetNodeStatusResponse,
   GetPeersRequest,
@@ -83,12 +85,14 @@ import {
   GetPeerMessagesResponse,
 } from '../routes/peers/getPeerMessages'
 import { GetRpcStatusRequest, GetRpcStatusResponse } from '../routes/rpc/getStatus'
+import { AddTransactionRequest, AddTransactionResponse } from '../routes/wallet/addTransaction'
 import { BurnAssetRequest, BurnAssetResponse } from '../routes/wallet/burnAsset'
 import {
   CreateTransactionRequest,
   CreateTransactionResponse,
 } from '../routes/wallet/createTransaction'
 import { ExportAccountRequest, ExportAccountResponse } from '../routes/wallet/exportAccount'
+import { GetAssetsRequest, GetAssetsResponse } from '../routes/wallet/getAssets'
 import { GetBalancesRequest, GetBalancesResponse } from '../routes/wallet/getBalances'
 import { GetAccountStatusRequest, GetAccountStatusResponse } from '../routes/wallet/getStatus'
 import { ImportAccountRequest, ImportAccountResponse } from '../routes/wallet/importAccount'
@@ -451,6 +455,15 @@ export abstract class RpcClient {
     ).waitForEnd()
   }
 
+  async getNetworkHashPower(
+    params: GetNetworkHashPowerRequest,
+  ): Promise<RpcResponseEnded<GetNetworkHashPowerResponse>> {
+    return this.request<GetNetworkHashPowerResponse>(
+      `${ApiNamespace.chain}/getNetworkHashPower`,
+      params,
+    ).waitForEnd()
+  }
+
   async showChain(
     params: ShowChainRequest = undefined,
   ): Promise<RpcResponseEnded<ShowChainResponse>> {
@@ -507,11 +520,24 @@ export abstract class RpcClient {
     return this.request<GetAssetResponse>(`${ApiNamespace.chain}/getAsset`, params).waitForEnd()
   }
 
+  getAssets(params: GetAssetsRequest): RpcResponse<void, GetAssetsResponse> {
+    return this.request<void, GetAssetsResponse>(`${ApiNamespace.wallet}/getAssets`, params)
+  }
+
   async postTransaction(
     params: PostTransactionRequest,
   ): Promise<RpcResponseEnded<PostTransactionResponse>> {
     return this.request<PostTransactionResponse>(
       `${ApiNamespace.wallet}/postTransaction`,
+      params,
+    ).waitForEnd()
+  }
+
+  async addTransaction(
+    params: AddTransactionRequest,
+  ): Promise<RpcResponseEnded<AddTransactionResponse>> {
+    return this.request<AddTransactionResponse>(
+      `${ApiNamespace.wallet}/addTransaction`,
       params,
     ).waitForEnd()
   }

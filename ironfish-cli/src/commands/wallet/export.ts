@@ -4,12 +4,19 @@
 import { spendingKeyToWords } from '@ironfish/rust-nodejs'
 import { ErrorUtils } from '@ironfish/sdk'
 import { CliUx, Flags } from '@oclif/core'
+import { bech32m } from 'bech32'
 import fs from 'fs'
 import jsonColorizer from 'json-colorizer'
 import path from 'path'
 import { IronfishCommand } from '../../command'
 import { ColorFlag, ColorFlagKey, RemoteFlags } from '../../flags'
-import { LANGUAGE_KEYS, LANGUAGES, selectLanguage } from '../../utils/language'
+import {
+  inferLanguageCode,
+  LANGUAGE_KEYS,
+  languageCodeToKey,
+  LANGUAGES,
+  selectLanguage,
+} from '../../utils/language'
 
 export class ExportCommand extends IronfishCommand {
   static description = `Export an account`
@@ -29,6 +36,10 @@ export class ExportCommand extends IronfishCommand {
       description: 'Language to use for mnemonic export',
       required: false,
       options: LANGUAGE_KEYS,
+    }),
+    json: Flags.boolean({
+      default: false,
+      description: 'Output the account as JSON, rather than the default bech32',
     }),
   }
 
@@ -55,6 +66,8 @@ export class ExportCommand extends IronfishCommand {
 
     const client = await this.sdk.connectRpc(local)
     const response = await client.exportAccount({ account })
+    const responseJSONString = JSON.stringify(response.content.account)
+
     let output
     if (flags.language) {
       output = spendingKeyToWords(
@@ -62,10 +75,26 @@ export class ExportCommand extends IronfishCommand {
         LANGUAGES[flags.language],
       )
     } else if (flags.mnemonic) {
-      const language = await selectLanguage()
-      output = spendingKeyToWords(response.content.account.spendingKey, language)
+      let languageCode = inferLanguageCode()
+      if (languageCode !== null) {
+        CliUx.ux.info(`Detected Language as '${languageCodeToKey(languageCode)}', exporting:`)
+      } else {
+        CliUx.ux.info(`Could not detect your language, please select language for export`)
+        languageCode = await selectLanguage()
+      }
+      output = spendingKeyToWords(response.content.account.spendingKey, languageCode)
+    } else if (flags.json) {
+      output = exportPath
+        ? JSON.stringify(response.content.account, undefined, '    ')
+        : responseJSONString
     } else {
-      output = JSON.stringify(response.content.account, undefined, '   ')
+      const responseBytes = Buffer.from(responseJSONString)
+      const lengthLimit = 1023
+      output = bech32m.encode(
+        'ironfishaccount00000',
+        bech32m.toWords(responseBytes),
+        lengthLimit,
+      )
     }
 
     if (exportPath) {
@@ -104,7 +133,7 @@ export class ExportCommand extends IronfishCommand {
       return
     }
 
-    if (color && !flags.language && !flags.mnemonic) {
+    if (color && flags.json) {
       output = jsonColorizer(output)
     }
     this.log(output)

@@ -6,6 +6,7 @@ import { Asset } from '@ironfish/rust-nodejs'
 import { BufferMap } from 'buffer-map'
 import { Assert } from '../../assert'
 import { FileSystem } from '../../fileSystems'
+import { GENESIS_BLOCK_PREVIOUS } from '../../primitives/block'
 import { NoteEncryptedHash } from '../../primitives/noteEncrypted'
 import { Nullifier } from '../../primitives/nullifier'
 import { TransactionHash } from '../../primitives/transaction'
@@ -18,7 +19,7 @@ import {
   NULL_ENCODING,
   PrefixEncoding,
   StringEncoding,
-  U32_ENCODING,
+  U32_ENCODING_BE,
   U64_ENCODING,
 } from '../../storage'
 import { StorageUtils } from '../../storage/database/utils'
@@ -33,7 +34,7 @@ import { HeadValue, NullableHeadValueEncoding } from './headValue'
 import { AccountsDBMeta, MetaValue, MetaValueEncoding } from './metaValue'
 import { TransactionValue, TransactionValueEncoding } from './transactionValue'
 
-export const VERSION_DATABASE_ACCOUNTS = 16
+export const VERSION_DATABASE_ACCOUNTS = 18
 
 const getAccountsDBMetaDefaults = (): AccountsDBMeta => ({
   defaultAccountId: null,
@@ -166,10 +167,10 @@ export class WalletDB {
     })
 
     this.sequenceToNoteHash = this.db.addStore({
-      name: 's',
+      name: 'SN',
       keyEncoding: new PrefixEncoding(
         new BufferEncoding(),
-        new PrefixEncoding(U32_ENCODING, new BufferEncoding(), 4),
+        new PrefixEncoding(U32_ENCODING_BE, new BufferEncoding(), 4),
         4,
       ),
       valueEncoding: NULL_ENCODING,
@@ -188,20 +189,20 @@ export class WalletDB {
     })
 
     this.sequenceToTransactionHash = this.db.addStore({
-      name: 'st',
+      name: 'ST',
       keyEncoding: new PrefixEncoding(
         new BufferEncoding(),
-        new PrefixEncoding(U32_ENCODING, new BufferEncoding(), 4),
+        new PrefixEncoding(U32_ENCODING_BE, new BufferEncoding(), 4),
         4,
       ),
       valueEncoding: NULL_ENCODING,
     })
 
     this.pendingTransactionHashes = this.db.addStore({
-      name: 'p',
+      name: 'PT',
       keyEncoding: new PrefixEncoding(
         new BufferEncoding(),
-        new PrefixEncoding(U32_ENCODING, new BufferEncoding(), 4),
+        new PrefixEncoding(U32_ENCODING_BE, new BufferEncoding(), 4),
         4,
       ),
       valueEncoding: NULL_ENCODING,
@@ -383,6 +384,19 @@ export class WalletDB {
 
   async clearNonChainNoteHashes(account: Account, tx?: IDatabaseTransaction): Promise<void> {
     await this.nonChainNoteHashes.clear(tx, account.prefixRange)
+  }
+
+  async *getTransactionHashesBySequence(
+    account: Account,
+    tx?: IDatabaseTransaction,
+  ): AsyncGenerator<{ sequence: number; hash: Buffer }> {
+    for await (const [, [sequence, hash]] of this.sequenceToTransactionHash.getAllKeysIter(
+      tx,
+      account.prefixRange,
+      { ordered: true },
+    )) {
+      yield { sequence, hash }
+    }
   }
 
   async *loadTransactions(
@@ -608,7 +622,7 @@ export class WalletDB {
   ): AsyncGenerator<Buffer> {
     const encoding = new PrefixEncoding(
       BUFFER_ENCODING,
-      U32_ENCODING,
+      U32_ENCODING_BE,
       account.prefix.byteLength,
     )
 
@@ -645,7 +659,7 @@ export class WalletDB {
   ): AsyncGenerator<Buffer> {
     const encoding = new PrefixEncoding(
       BUFFER_ENCODING,
-      U32_ENCODING,
+      U32_ENCODING_BE,
       account.prefix.byteLength,
     )
 
@@ -750,11 +764,11 @@ export class WalletDB {
     await this.balances.clear(tx, account.prefixRange)
   }
 
-  async *loadExpiredTransactions(
+  async *loadExpiredTransactionHashes(
     account: Account,
     headSequence: number,
     tx?: IDatabaseTransaction,
-  ): AsyncGenerator<TransactionValue> {
+  ): AsyncGenerator<Buffer> {
     const encoding = this.pendingTransactionHashes.keyEncoding
 
     const expiredRange = StorageUtils.getPrefixesKeyRange(
@@ -766,6 +780,20 @@ export class WalletDB {
       tx,
       expiredRange,
     )) {
+      yield transactionHash
+    }
+  }
+
+  async *loadExpiredTransactions(
+    account: Account,
+    headSequence: number,
+    tx?: IDatabaseTransaction,
+  ): AsyncGenerator<TransactionValue> {
+    for await (const transactionHash of this.loadExpiredTransactionHashes(
+      account,
+      headSequence,
+      tx,
+    )) {
       const transaction = await this.loadTransaction(account, transactionHash, tx)
       Assert.isNotUndefined(transaction)
 
@@ -773,11 +801,11 @@ export class WalletDB {
     }
   }
 
-  async *loadPendingTransactions(
+  async *loadPendingTransactionHashes(
     account: Account,
     headSequence: number,
     tx?: IDatabaseTransaction,
-  ): AsyncGenerator<TransactionValue> {
+  ): AsyncGenerator<Buffer> {
     const encoding = this.pendingTransactionHashes.keyEncoding
 
     const noExpirationRange = StorageUtils.getPrefixKeyRange(
@@ -788,10 +816,7 @@ export class WalletDB {
       tx,
       noExpirationRange,
     )) {
-      const transaction = await this.loadTransaction(account, transactionHash, tx)
-      Assert.isNotUndefined(transaction)
-
-      yield transaction
+      yield transactionHash
     }
 
     const pendingRange = StorageUtils.getPrefixesKeyRange(
@@ -802,6 +827,20 @@ export class WalletDB {
     for await (const [, [, transactionHash]] of this.pendingTransactionHashes.getAllKeysIter(
       tx,
       pendingRange,
+    )) {
+      yield transactionHash
+    }
+  }
+
+  async *loadPendingTransactions(
+    account: Account,
+    headSequence: number,
+    tx?: IDatabaseTransaction,
+  ): AsyncGenerator<TransactionValue> {
+    for await (const transactionHash of this.loadPendingTransactionHashes(
+      account,
+      headSequence,
+      tx,
     )) {
       const transaction = await this.loadTransaction(account, transactionHash, tx)
       Assert.isNotUndefined(transaction)
@@ -910,5 +949,50 @@ export class WalletDB {
 
       yield transaction
     }
+  }
+
+  async putAsset(
+    account: Account,
+    assetId: Buffer,
+    assetValue: AssetValue,
+    tx?: IDatabaseTransaction,
+  ): Promise<void> {
+    await this.assets.put([account.prefix, assetId], assetValue, tx)
+  }
+
+  async getAsset(
+    account: Account,
+    assetId: Buffer,
+    tx?: IDatabaseTransaction,
+  ): Promise<AssetValue | undefined> {
+    if (assetId.equals(Asset.nativeId())) {
+      return {
+        createdTransactionHash: GENESIS_BLOCK_PREVIOUS,
+        id: Asset.nativeId(),
+        metadata: Buffer.from('Native asset of Iron Fish blockchain', 'utf8'),
+        name: Buffer.from('$IRON', 'utf8'),
+        owner: Buffer.from('Iron Fish', 'utf8'),
+        blockHash: null,
+        sequence: null,
+        supply: null,
+      }
+    }
+    return this.assets.get([account.prefix, assetId], tx)
+  }
+
+  async *loadAssets(account: Account, tx?: IDatabaseTransaction): AsyncGenerator<AssetValue> {
+    for await (const asset of this.assets.getAllValuesIter(tx, account.prefixRange, {
+      ordered: true,
+    })) {
+      yield asset
+    }
+  }
+
+  async deleteAsset(
+    account: Account,
+    assetId: Buffer,
+    tx?: IDatabaseTransaction,
+  ): Promise<void> {
+    await this.assets.del([account.prefix, assetId], tx)
   }
 }
