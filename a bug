@@ -1,0 +1,33 @@
+# ironfish wallet:send
+? Select the asset you wish to send d7c86706f5817aa718cd1cfad03233bcd64a7789fd9422d3b17af6823a7e6ac6 ($IRON)
+Enter the amount (balance: 20.00022304): 20
+Enter the public address of the recipient: 54f35c8e5c0634ee0cab3880e67f2048fe6b20136b8388b1b5d50f750c718b43
+? Select the fee you wish to use for this transaction low: 0.00000001 IRON
+
+You are about to create a transaction:
+$IRON 20.00000000 plus a transaction fee of $IRON 0.00000001 to 54f35c8e5c0634ee0cab3880e67f2048fe6b20136b8388b1b5d50f750c718b43 from the account liverphong
+
+* This action is NOT reversible *
+
+Do you confirm (Y/N)?: y
+Creating the transaction: [████████████████████████████████████████] 100% | ETA: 0s
+
+Sending $IRON 20.00000000 to 54f35c8e5c0634ee0cab3880e67f2048fe6b20136b8388b1b5d50f750c718b43 from liverphong
+Transaction Hash: 54412eafb1edc01c8fc49a76369cc9789eee376ef3243c6991bfc9abc41c6c23
+Transaction fee: $IRON 0.00000001
+
+Find the transaction on https://explorer.ironfish.network/transaction/54412eafb1edc01c8fc49a76369cc9789eee376ef3243c6991bfc9abc41c6c23 (it can take a few minutes before the transaction appears in the Explorer)
+
+# ironfish wallet:balances
+Account: liverphong
+ Asset Name Asset Id                                                         Confirmed Balance 
+ ────────── ──────────────────────────────────────────────────────────────── ───────────────── 
+ liverphong 54f35c8e5c0634ee0cab3880e67f2048fe6b20136b8388b1b5d50f750c718b43 2.00000010        
+ $IRON      d7c86706f5817aa718cd1cfad03233bcd64a7789fd9422d3b17af6823a7e6ac6 0.00022303        
+# ^C
+# ironfish wallet:balances
+Account: liverphong
+ Asset Name Asset Id                                                         Confirmed Balance 
+ ────────── ──────────────────────────────────────────────────────────────── ───────────────── 
+ liverphong 54f35c8e5c0634ee0cab3880e67f2048fe6b20136b8388b1b5d50f750c718b43 2.00000010        
+ $IRON      d7c86706f5817aa718cd1cfad03233bcd64a7789fd9422d3b17af6823a7e6ac6 0.00022303
